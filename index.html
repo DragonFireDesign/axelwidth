@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AXEL-WIDTH // Truck Sizer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #070707;
+            --surface: #0e0e0e;
+            --border: #1c1c1c;
+            --text: #eae5d8;
+            --mid: #555;
+            --dim: #2a2a2a;
+            --orange: #e84b00;
+            --maple: #e2dac8;
+            --maple-dark: #c8bfa6;
+            --dw: #2fff00;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Barlow Condensed', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* ─── TICKER ─────────────────────────────────────────── */
+        .ticker { background: var(--orange); height: 30px; overflow: hidden; display: flex; align-items: center; }
+        .ticker-track { display: flex; animation: roll 28s linear infinite; white-space: nowrap; }
+        .ticker-track:hover { animation-play-state: paused; }
+        @keyframes roll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .tick {
+            display: inline-flex; align-items: center; gap: 18px;
+            padding: 0 24px; font-weight: 700; font-size: 0.7rem;
+            letter-spacing: 0.14em; text-transform: uppercase; color: #fff;
+        }
+        .tick-dot { width: 4px; height: 4px; background: rgba(255,255,255,.45); border-radius: 50%; flex-shrink: 0; }
+
+        /* ─── NAV ────────────────────────────────────────────── */
+        nav {
+            position: sticky; top: 0; z-index: 100;
+            background: var(--bg); border-bottom: 1px solid var(--border);
+            height: 50px; display: flex; align-items: center;
+            justify-content: space-between; padding: 0 28px;
+        }
+        .logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.35rem; letter-spacing: 2px; }
+        .logo span { color: var(--orange); }
+        .nav-links { display: flex; gap: 24px; align-items: center; }
+        .nav-a {
+            font-weight: 700; font-size: 0.7rem; letter-spacing: 0.12em;
+            text-transform: uppercase; color: var(--mid); text-decoration: none; transition: color .15s;
+        }
+        .nav-a:hover { color: var(--text); }
+        .nav-a.dw {
+            color: var(--dw); border: 1px solid #1a4a00; padding: 5px 12px; transition: background .15s;
+        }
+        .nav-a.dw:hover { background: #0a2200; }
+
+        /* ─── HERO ───────────────────────────────────────────── */
+        .hero {
+            text-align: center; padding: 52px 24px 40px;
+            border-bottom: 1px solid var(--border);
+        }
+        .hero-pre {
+            font-weight: 700; font-size: 0.7rem; letter-spacing: 0.22em;
+            text-transform: uppercase; color: var(--orange); margin-bottom: 14px;
+        }
+        .hero-h1 {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: clamp(2.8rem, 7vw, 5.5rem);
+            letter-spacing: 1px; line-height: 1.0; margin-bottom: 14px;
+        }
+        .hero-h1 em { color: var(--orange); font-style: normal; }
+        .hero-sub { font-size: 1rem; font-weight: 400; color: var(--mid); letter-spacing: 0.03em; }
+
+        /* ─── SIZER LAYOUT ───────────────────────────────────── */
+        #sizer { padding: 48px 24px 72px; }
+
+        .size-row {
+            display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
+            margin-bottom: 36px;
+        }
+        .sz-btn {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--mid);
+            font-family: 'DM Mono', monospace; font-size: 0.82rem; font-weight: 500;
+            padding: 9px 14px; cursor: pointer; transition: all .15s; letter-spacing: 0.04em;
+            position: relative;
+        }
+        .sz-btn::after { content: '"'; opacity: .5; font-size: .7rem; }
+        .sz-btn:hover { border-color: #3a3a3a; color: var(--text); }
+        .sz-btn.active { background: var(--orange); border-color: var(--orange); color: #fff; }
+
+        /* ─── BOARD STAGE ────────────────────────────────────── */
+        .stage {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .board-wrap {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        #board-svg {
+            width: 100%; height: auto; display: block;
+        }
+
+        /* SVG transitions */
+        #deck-path, #grip-path {
+            transition: d .55s cubic-bezier(.34,1.4,.64,1);
+        }
+        /* Wheel cx transitions via CSS property */
+        .wh {
+            transition: cx .55s cubic-bezier(.34,1.4,.64,1);
+        }
+        .wh-hub {
+            transition: cx .55s cubic-bezier(.34,1.4,.64,1);
+        }
+
+        /* ─── ANNOTATION PANEL ───────────────────────────────── */
+        .annotation {
+            width: 100%;
+            max-width: 400px;
+            margin-top: 16px;
+            padding: 16px 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-top: 2px solid var(--orange);
+            display: none;
+        }
+        .annotation.visible { display: block; }
+        .ann-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 7px 0; border-bottom: 1px solid var(--border);
+        }
+        .ann-row:last-child { border-bottom: none; }
+        .ann-label {
+            font-family: 'DM Mono', monospace; font-size: 0.72rem;
+            font-weight: 500; color: var(--mid); letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .ann-val {
+            font-family: 'DM Mono', monospace; font-size: 0.88rem;
+            font-weight: 500; color: var(--text); letter-spacing: 0.05em;
+        }
+        .ann-val.accent { color: var(--orange); }
+
+        /* ─── RESULTS ────────────────────────────────────────── */
+        .results-wrap {
+            width: 100%; max-width: 400px;
+            margin-top: 28px;
+        }
+        .results-pre {
+            font-size: 0.7rem; font-weight: 700; letter-spacing: 0.18em;
+            text-transform: uppercase; color: var(--mid); margin-bottom: 16px; text-align: center;
+        }
+        .cards {
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-left: 3px solid var(--orange);
+            padding: 14px 18px;
+            display: flex; align-items: center; gap: 16px;
+            opacity: 0; transform: translateY(6px);
+            transition: opacity .3s ease, transform .3s ease;
+        }
+        .card.in { opacity: 1; transform: translateY(0); }
+        .card:nth-child(2) { transition-delay: .05s; }
+        .card:nth-child(3) { transition-delay: .1s; }
+        .card-brand {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.35rem; letter-spacing: 1px; flex: 1;
+        }
+        .card-size {
+            font-family: 'DM Mono', monospace;
+            font-size: 1.8rem; font-weight: 500;
+            color: var(--orange); line-height: 1; flex-shrink: 0;
+        }
+        .card-shop {
+            display: inline-block;
+            background: transparent; border: 1px solid var(--border);
+            color: var(--mid);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-weight: 700; font-size: 0.7rem;
+            letter-spacing: 0.12em; text-transform: uppercase;
+            padding: 7px 12px; text-decoration: none; flex-shrink: 0;
+            transition: all .15s;
+        }
+        .card-shop:hover { background: var(--orange); border-color: var(--orange); color: #fff; }
+
+        .idle-msg {
+            border: 1px dashed var(--border); padding: 32px;
+            text-align: center; font-size: 0.75rem; font-weight: 700;
+            letter-spacing: 0.16em; text-transform: uppercase; color: #2a2a2a;
+        }
+
+        /* ─── BRANDS ─────────────────────────────────────────── */
+        #brands { padding: 80px 24px; border-top: 1px solid var(--border); }
+        .section-ey {
+            font-size: 0.68rem; font-weight: 700; letter-spacing: 0.22em;
+            text-transform: uppercase; color: var(--orange); margin-bottom: 10px;
+        }
+        .section-h {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: clamp(2rem, 5vw, 3.2rem); letter-spacing: 1px; margin-bottom: 44px;
+        }
+        .brands-grid {
+            max-width: 1040px; margin: 0 auto;
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 1px; background: var(--border);
+        }
+        @media (max-width: 700px) { .brands-grid { grid-template-columns: 1fr; } }
+        .b-cell {
+            background: var(--bg); padding: 36px 28px; transition: background .2s;
+        }
+        .b-cell:hover { background: var(--surface); }
+        .b-tag {
+            display: inline-block; font-weight: 700; font-size: 0.62rem;
+            letter-spacing: 0.15em; text-transform: uppercase;
+            padding: 3px 8px; margin-bottom: 14px;
+        }
+        .b-name {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 2rem; letter-spacing: 1px; margin-bottom: 10px;
+        }
+        .b-desc { font-size: 0.9rem; color: #666; line-height: 1.6; margin-bottom: 18px; }
+        .b-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+        .chip {
+            font-family: 'DM Mono', monospace; font-size: 0.75rem;
+            padding: 3px 8px; border: 1px solid var(--border); color: #444;
+        }
+
+        /* ─── DEATHWINGS ─────────────────────────────────────── */
+        #dw a { transition: opacity .2s; }
+        #dw a:hover { opacity: 0.9; }
+
+        /* ─── FOOTER ─────────────────────────────────────────── */
+        footer {
+            padding: 24px 28px; border-top: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .ft-logo {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 0.95rem; letter-spacing: 2px; color: #222;
+        }
+        .ft-copy { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #222; }
+    </style>
+</head>
+<body>
+
+<!-- TICKER -->
+<div class="ticker">
+    <div class="ticker-track">
+        <span class="tick">Independent Trucks <span class="tick-dot"></span></span>
+        <span class="tick">Thunder Trucks <span class="tick-dot"></span></span>
+        <span class="tick">Venture Trucks <span class="tick-dot"></span></span>
+        <span class="tick">Axle width matters more than you think <span class="tick-dot"></span></span>
+        <span class="tick">7.5&rdquo; — 9.5&rdquo; covered <span class="tick-dot"></span></span>
+        <span class="tick">Free forever <span class="tick-dot"></span></span>
+        <span class="tick">Pick your deck. Find your trucks. <span class="tick-dot"></span></span>
+        <!-- duplicate -->
+        <span class="tick">Independent Trucks <span class="tick-dot"></span></span>
+        <span class="tick">Thunder Trucks <span class="tick-dot"></span></span>
+        <span class="tick">Venture Trucks <span class="tick-dot"></span></span>
+        <span class="tick">Axle width matters more than you think <span class="tick-dot"></span></span>
+        <span class="tick">7.5&rdquo; — 9.5&rdquo; covered <span class="tick-dot"></span></span>
+        <span class="tick">Free forever <span class="tick-dot"></span></span>
+        <span class="tick">Pick your deck. Find your trucks. <span class="tick-dot"></span></span>
+    </div>
+</div>
+
+<!-- NAV -->
+<nav>
+    <div class="logo">AXEL<span>-</span>WIDTH</div>
+    <div class="nav-links">
+        <a href="#sizer" class="nav-a">Sizer</a>
+        <a href="#brands" class="nav-a">Brands</a>
+        <a href="#supporters" class="nav-a">Supporters</a>
+    </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+    <div class="hero-pre">Free Truck Sizing Tool</div>
+    <h1 class="hero-h1">WRONG TRUCKS.<br><em>WRONG RIDE.</em></h1>
+    <p class="hero-sub">Select your deck width and we'll tell you exactly which Independent, Thunder, or Venture to run.</p>
+</header>
+
+<!-- SIZER -->
+<section id="sizer">
+    <!-- Deck size buttons -->
+    <div class="size-row" id="size-row"></div>
+
+    <div class="stage">
+
+        <!-- THE BOARD SVG -->
+        <div class="board-wrap">
+            <svg id="board-svg" viewBox="0 0 360 680" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <!-- Subtle dot grid (background) -->
+                    <pattern id="dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+                        <circle cx="10" cy="10" r=".7" fill="#141414"/>
+                    </pattern>
+                    <!-- Wood grain: slight horizontal lines across the deck -->
+                    <pattern id="grain" x="0" y="0" width="360" height="4" patternUnits="userSpaceOnUse">
+                        <rect width="360" height="4" fill="#e2dac8"/>
+                        <rect width="360" height=".8" y="1.6" fill="rgba(0,0,0,.06)"/>
+                    </pattern>
+                    <!-- Grip crosshatch -->
+                    <pattern id="grip" x="0" y="0" width="5" height="5" patternUnits="userSpaceOnUse">
+                        <line x1="0" y1="5" x2="5" y2="0" stroke="#000" stroke-width=".9" opacity=".18"/>
+                        <line x1="0" y1="0" x2="5" y2="5" stroke="#000" stroke-width=".9" opacity=".18"/>
+                    </pattern>
+                </defs>
+
+                <!-- Background -->
+                <rect width="360" height="680" fill="#070707"/>
+                <rect width="360" height="680" fill="url(#dots)"/>
+
+                <!-- ── DECK ── -->
+                <!-- Wood layer -->
+                <path id="deck-path" fill="url(#grain)" stroke="#c4bb9e" stroke-width="1.2"/>
+                <!-- Grip overlay -->
+                <path id="grip-path" fill="url(#grip)"/>
+                <!-- Edge highlight (very thin inner line) -->
+                <path id="edge-path" fill="none" stroke="rgba(255,255,255,.12)" stroke-width=".8"/>
+
+                <!-- ── BOLTS (4 per truck) ── -->
+                <circle id="bn1" r="3" fill="#b8b09a" stroke="#a09880" stroke-width=".8"/>
+                <circle id="bn2" r="3" fill="#b8b09a" stroke="#a09880" stroke-width=".8"/>
+                <circle id="bn3" r="3" fill="#b8b09a" stroke="#a09880" stroke-width=".8"/>
+                <circle id="bn4" r="3" fill="#b8b09a" stroke="#a09880" stroke-width=".8"/>
+                <circle id="bt1" r="3" fill="#b8b09a" stroke="#a09880" stroke-width=".8"/>
+                <circle id="bt2" r="3" fill="#b8b09a" stroke="#a09880" stroke-width=".8"/>
+                <circle id="bt3" r="3" fill="#b8b09a" stroke="#a09880" stroke-width=".8"/>
+                <circle id="bt4" r="3" fill="#b8b09a" stroke="#a09880" stroke-width=".8"/>
+
+                <!-- ── NOSE TRUCK ── -->
+                <!-- Hanger bar -->
+                <rect id="hn" height="13" rx="2" ry="2" fill="#1e1e1e" stroke="#2e2e2e" stroke-width="1"/>
+                <!-- Axle line -->
+                <line id="axn" stroke="#e84b00" stroke-width="3.5" stroke-linecap="round"/>
+                <!-- Wheels left/right -->
+                <circle id="wn-l" class="wh" r="21" fill="#0d0d0d" stroke="#e84b00" stroke-width="2.8"/>
+                <circle id="wn-r" class="wh" r="21" fill="#0d0d0d" stroke="#e84b00" stroke-width="2.8"/>
+                <!-- Wheel hubs -->
+                <circle id="wn-lh" class="wh-hub" r="7" fill="#141414" stroke="#2a2a2a" stroke-width="1"/>
+                <circle id="wn-rh" class="wh-hub" r="7" fill="#141414" stroke="#2a2a2a" stroke-width="1"/>
+
+                <!-- ── TAIL TRUCK ── -->
+                <rect id="ht" height="13" rx="2" ry="2" fill="#1e1e1e" stroke="#2e2e2e" stroke-width="1"/>
+                <line id="axt" stroke="#e84b00" stroke-width="3.5" stroke-linecap="round"/>
+                <circle id="wt-l" class="wh" r="21" fill="#0d0d0d" stroke="#e84b00" stroke-width="2.8"/>
+                <circle id="wt-r" class="wh" r="21" fill="#0d0d0d" stroke="#e84b00" stroke-width="2.8"/>
+                <circle id="wt-lh" class="wh-hub" r="7" fill="#141414" stroke="#2a2a2a" stroke-width="1"/>
+                <circle id="wt-rh" class="wh-hub" r="7" fill="#141414" stroke="#2a2a2a" stroke-width="1"/>
+
+                <!-- ── MEASUREMENT ANNOTATION (nose truck area) ── -->
+                <g id="ann-g" opacity="0" style="transition: opacity .4s ease;">
+                    <!-- Axle dimension line -->
+                    <line id="ann-ax-line" y1="136" y2="136" stroke="#e84b00" stroke-width="1.2" stroke-dasharray="4,3"/>
+                    <line id="ann-ax-cl" x2="0" y1="128" y2="144" stroke="#e84b00" stroke-width="1.2"/>
+                    <line id="ann-ax-cr" x2="0" y1="128" y2="144" stroke="#e84b00" stroke-width="1.2"/>
+                    <!-- Deck dimension line -->
+                    <line id="ann-dk-line" y1="122" y2="122" stroke="#555" stroke-width="1" stroke-dasharray="3,3"/>
+                    <line id="ann-dk-cl" x2="0" y1="116" y2="128" stroke="#555" stroke-width="1"/>
+                    <line id="ann-dk-cr" x2="0" y1="116" y2="128" stroke="#555" stroke-width="1"/>
+                    <!-- Labels -->
+                    <text id="ann-ax-txt" y="110" text-anchor="middle"
+                        font-family="DM Mono, monospace" font-size="11" fill="#e84b00" font-weight="500"></text>
+                    <text id="ann-dk-txt" y="98" text-anchor="middle"
+                        font-family="DM Mono, monospace" font-size="10" fill="#555"></text>
+                </g>
+
+                <!-- ── PROMPT (pre-selection) ── -->
+                <text id="prompt" x="180" y="340" text-anchor="middle"
+                    font-family="Barlow Condensed, sans-serif" font-size="15" font-weight="700"
+                    fill="#222" letter-spacing="3">SELECT A SIZE ABOVE</text>
+            </svg>
+        </div>
+
+        <!-- ANNOTATION PANEL (under board) -->
+        <div class="annotation" id="ann-panel">
+            <div class="ann-row">
+                <span class="ann-label">Deck</span>
+                <span class="ann-val accent" id="ann-deck-val">—</span>
+            </div>
+            <div class="ann-row">
+                <span class="ann-label">Axle</span>
+                <span class="ann-val accent" id="ann-axle-val">—</span>
+            </div>
+            <div class="ann-row">
+                <span class="ann-label">Fit</span>
+                <span class="ann-val" id="ann-fit-val">—</span>
+            </div>
+        </div>
+
+        <!-- RESULT CARDS -->
+        <div class="results-wrap">
+            <div class="results-pre" id="results-pre" style="display:none;"></div>
+            <div class="cards" id="cards">
+                <div class="idle-msg">← Pick a deck width to see your trucks</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- BRANDS -->
+<section id="brands">
+    <div style="max-width:1040px;margin:0 auto;">
+        <div class="section-ey">Know Your Hardware</div>
+        <h2 class="section-h">The Big Three</h2>
+        <div class="brands-grid">
+            <div class="b-cell">
+                <div class="b-tag" style="background:var(--text);color:var(--bg);">Industry Standard</div>
+                <div class="b-name">Independent</div>
+                <p class="b-desc">The benchmark. Near-indestructible. 3-digit sizing (129 → 169) maps to axle width in millimeters. Preferred for transition, all-terrain and heavy skating.</p>
+                <div class="b-chips">
+                    <span class="chip">129</span><span class="chip">139</span><span class="chip">144</span>
+                    <span class="chip">149</span><span class="chip">159</span><span class="chip">169</span>
+                </div>
+            </div>
+            <div class="b-cell">
+                <div class="b-tag" style="background:var(--orange);color:#fff;">Street Weapon</div>
+                <div class="b-name">Thunder</div>
+                <p class="b-desc">Lower profile for faster pop response. Sizing (145–161) is partially height-based, which is why the numbers confuse people — use this tool, not guesswork.</p>
+                <div class="b-chips">
+                    <span class="chip">145</span><span class="chip">147</span><span class="chip">148</span>
+                    <span class="chip">149</span><span class="chip">151</span><span class="chip">161</span>
+                </div>
+            </div>
+            <div class="b-cell">
+                <div class="b-tag" style="background:var(--dim);color:#888;">Ledge King</div>
+                <div class="b-name">Venture</div>
+                <p class="b-desc">The smoothest grinder. Decimal sizing (5.0 → 6.1) is clean once you learn it — it's just axle width in inches. Go-to for technical street and ledge work.</p>
+                <div class="b-chips">
+                    <span class="chip">5.0</span><span class="chip">5.25</span><span class="chip">5.6</span>
+                    <span class="chip">5.8</span><span class="chip">6.1</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SUPPORTERS -->
+<section id="supporters" style="padding: 80px 24px; border-top: 1px solid var(--border);">
+    <div style="max-width: 1040px; margin: 0 auto;">
+        <p style="font-family: 'Barlow Condensed', sans-serif; font-size: 0.65rem; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--orange); margin-bottom: 24px;">Supported By</p>
+        <a href="https://wearedeathwings.com" target="_blank" style="display: block; border: 2px solid var(--dw); line-height: 0;">
+            <img src="https://res.cloudinary.com/dragon-fire-design-studio/image/upload/f_auto,q_90/v1772120464/Axel%20Width/axel-banner_nfufi2.png" 
+                 alt="Deathwings — Refuse to Fade"
+                 style="width:100%; height:auto; display:block;">
+        </a>
+    </div>
+</section>
+<footer>
+    <div class="ft-logo">AXEL-WIDTH</div>
+    <div class="ft-copy">© 2026 · A Definitive Ventures site</div>
+</footer>
+
+<script>
+// ─── DATA ──────────────────────────────────────────────────────────────
+const TRUCK_DATA = [
+    { range:[7.4, 7.75],   deckW:7.625, axleW:7.625, axleStr:'7.625"', indy:'129',     thunder:'145',  venture:'5.0'    },
+    { range:[7.75, 8.125], deckW:7.875, axleW:8.0,   axleStr:'8.0"',   indy:'139',     thunder:'147',  venture:'5.25'   },
+    { range:[8.125,8.375], deckW:8.25,  axleW:8.25,  axleStr:'8.25"',  indy:'144',     thunder:'148',  venture:'5.6'    },
+    { range:[8.375,8.625], deckW:8.5,   axleW:8.5,   axleStr:'8.5"',   indy:'149',     thunder:'149',  venture:'5.8'    },
+    { range:[8.625,9.0],   deckW:8.75,  axleW:8.75,  axleStr:'8.75"',  indy:'159',     thunder:'151',  venture:'6.1'    },
+    { range:[9.0, 10.5],   deckW:9.25,  axleW:9.125, axleStr:'9.0"+"', indy:'169/215', thunder:'161',  venture:'Custom' }
+];
+
+const SIZES = [7.5, 7.75, 8.0, 8.125, 8.25, 8.375, 8.5, 8.75, 9.0, 9.5];
+
+// ─── SVG GEOMETRY ──────────────────────────────────────────────────────
+const CX   = 180;   // SVG center x
+const NYT  = 162;   // Nose truck y (axle center)
+const TYT  = 518;   // Tail truck y (axle center)
+const DT   = 78;    // Deck top y
+const DB   = 602;   // Deck bottom y
+const WSCL = 34;    // px per inch (width scale)
+
+function getDeckPath(deckWidth) {
+    const hw  = (deckWidth / 2) * WSCL;  // half deck width in px
+    const nw  = hw * 0.94;  // nose half-width
+    const tw  = hw * 0.89;  // tail half-width
+    const ww  = hw * 0.83;  // waist half-width
+    const mid = (DT + DB) / 2;
+    const q1  = DT + (mid - DT) * 0.3;
+    const q3  = mid + (DB - mid) * 0.7;
+
+    return [
+        `M ${CX} ${DT}`,
+        `C ${CX + nw * 1.6} ${DT}   ${CX + hw} ${DT + 105}  ${CX + hw} ${q1}`,
+        `C ${CX + hw} ${q1 + 55}    ${CX + ww} ${mid - 28}   ${CX + ww} ${mid}`,
+        `C ${CX + ww} ${mid + 28}   ${CX + hw} ${q3 - 55}    ${CX + hw} ${q3}`,
+        `C ${CX + hw} ${DB - 105}   ${CX + tw * 1.6} ${DB}   ${CX} ${DB}`,
+        `C ${CX - tw * 1.6} ${DB}   ${CX - hw} ${DB - 105}   ${CX - hw} ${q3}`,
+        `C ${CX - hw} ${q3 - 55}    ${CX - ww} ${mid + 28}   ${CX - ww} ${mid}`,
+        `C ${CX - ww} ${mid - 28}   ${CX - hw} ${q1 + 55}    ${CX - hw} ${q1}`,
+        `C ${CX - hw} ${DT + 105}   ${CX - nw * 1.6} ${DT}   ${CX} ${DT}`,
+        `Z`
+    ].join(' ');
+}
+
+function getAxleHw(axleWidth) {
+    return (axleWidth / 2) * WSCL;
+}
+
+function setAttr(id, attrs) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+}
+
+function updateSVG(match) {
+    const deckPath = getDeckPath(match.deckW);
+    const deckHw   = (match.deckW / 2) * WSCL;
+    const axleHw   = getAxleHw(match.axleW);
+    const hangerHw = axleHw * 0.86;
+
+    // Deck paths
+    setAttr('deck-path', { d: deckPath });
+    setAttr('grip-path', { d: deckPath });
+    setAttr('edge-path', { d: deckPath });
+
+    // Bolt holes (±18px x, ±13px y from truck center)
+    const bx = 18, by = 13;
+    const boltPositions = [
+        [-bx,-by],[-bx,+by],[+bx,-by],[+bx,+by]
+    ];
+    boltPositions.forEach(([dx,dy], i) => {
+        setAttr(`bn${i+1}`, { cx: CX+dx, cy: NYT+dy });
+        setAttr(`bt${i+1}`, { cx: CX+dx, cy: TYT+dy });
+    });
+
+    // Nose truck
+    setAttr('hn',  { x: CX - hangerHw, y: NYT - 6.5, width: hangerHw * 2 });
+    setAttr('axn', { x1: CX - axleHw, y1: NYT, x2: CX + axleHw, y2: NYT });
+    // wheel cx via attribute (CSS transitions on cx property in modern browsers)
+    ['wn-l','wn-lh'].forEach(id => setAttr(id, { cx: CX - axleHw, cy: NYT }));
+    ['wn-r','wn-rh'].forEach(id => setAttr(id, { cx: CX + axleHw, cy: NYT }));
+
+    // Tail truck
+    setAttr('ht',  { x: CX - hangerHw, y: TYT - 6.5, width: hangerHw * 2 });
+    setAttr('axt', { x1: CX - axleHw, y1: TYT, x2: CX + axleHw, y2: TYT });
+    ['wt-l','wt-lh'].forEach(id => setAttr(id, { cx: CX - axleHw, cy: TYT }));
+    ['wt-r','wt-rh'].forEach(id => setAttr(id, { cx: CX + axleHw, cy: TYT }));
+
+    // Measurement annotations
+    document.getElementById('ann-g').style.opacity = '1';
+
+    // Axle measure (at y=136)
+    setAttr('ann-ax-line', { x1: CX - axleHw, x2: CX + axleHw });
+    setAttr('ann-ax-cl', { x1: CX - axleHw, x2: CX - axleHw });
+    setAttr('ann-ax-cr', { x1: CX + axleHw, x2: CX + axleHw });
+    setAttr('ann-ax-txt', { x: CX });
+    document.getElementById('ann-ax-txt').textContent = `← ${match.axleW}" axle →`;
+
+    // Deck measure (at y=122)
+    setAttr('ann-dk-line', { x1: CX - deckHw, x2: CX + deckHw });
+    setAttr('ann-dk-cl', { x1: CX - deckHw, x2: CX - deckHw });
+    setAttr('ann-dk-cr', { x1: CX + deckHw, x2: CX + deckHw });
+    setAttr('ann-dk-txt', { x: CX });
+    document.getElementById('ann-dk-txt').textContent = `← ${match.deckW}" deck →`;
+}
+
+function renderAnnotationPanel(deckSize, match) {
+    const panel = document.getElementById('ann-panel');
+    panel.classList.add('visible');
+
+    document.getElementById('ann-deck-val').textContent = `${deckSize}"`;
+    document.getElementById('ann-axle-val').textContent = match.axleStr;
+
+    const diff = Math.abs(match.deckW - match.axleW);
+    const fitText = diff < 0.01
+        ? '✓ Perfect flush match'
+        : match.axleW > match.deckW
+            ? `Axle ${(match.axleW - match.deckW).toFixed(3)}" wider (good for transition)`
+            : `Deck ${(match.deckW - match.axleW).toFixed(3)}" wider (narrow setup)`;
+    document.getElementById('ann-fit-val').textContent = fitText;
+}
+
+function renderCards(deckSize, match) {
+    const pre = document.getElementById('results-pre');
+    pre.style.display = 'block';
+    pre.textContent = `Trucks for a ${deckSize}" deck`;
+
+    const brands = [
+        { name: 'Independent', size: match.indy,    href: `#` },
+        { name: 'Thunder',     size: match.thunder, href: `#` },
+        { name: 'Venture',     size: match.venture, href: `#` }
+    ];
+
+    const container = document.getElementById('cards');
+    container.innerHTML = brands.map(b => `
+        <div class="card">
+            <span class="card-brand">${b.name}</span>
+            <span class="card-size">${b.size}</span>
+            <a href="${b.href}" class="card-shop">Shop →</a>
+        </div>
+    `).join('');
+
+    requestAnimationFrame(() => {
+        container.querySelectorAll('.card').forEach(c => c.classList.add('in'));
+    });
+}
+
+function getMatch(size) {
+    return TRUCK_DATA.find(d => size >= d.range[0] && size <= d.range[1]);
+}
+
+let selected = null;
+
+function pickDeck(size, btn) {
+    if (selected === size) return;
+    selected = size;
+
+    document.querySelectorAll('.sz-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const match = getMatch(size);
+    if (!match) return;
+
+    const prompt = document.getElementById('prompt');
+    if (prompt) prompt.style.display = 'none';
+
+    updateSVG(match);
+    renderAnnotationPanel(size, match);
+    renderCards(size, match);
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────────
+(function init() {
+    const row = document.getElementById('size-row');
+    SIZES.forEach(size => {
+        const btn = document.createElement('button');
+        btn.className = 'sz-btn';
+        btn.dataset.size = size;
+        btn.textContent = size;
+        btn.onclick = () => pickDeck(size, btn);
+        row.appendChild(btn);
+    });
+
+    // Default: 8.25"
+    const def = row.querySelector('[data-size="8.25"]');
+    if (def) pickDeck(8.25, def);
+})();
+</script>
+</body>
+</html>
